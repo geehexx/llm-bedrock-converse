@@ -1,85 +1,224 @@
 # llm-bedrock-converse
 
-LLM plugin for AWS Bedrock using the Converse API with full tool calling support.
+[![PyPI](https://img.shields.io/pypi/v/llm-bedrock-converse.svg)](https://pypi.org/project/llm-bedrock-converse/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/geehexx/llm-bedrock-converse/blob/main/LICENSE)
+[![Python](https://img.shields.io/pypi/pyversions/llm-bedrock-converse.svg)](https://pypi.org/project/llm-bedrock-converse/)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/geehexx/llm-bedrock-converse)
 
-## Features
+A powerful [LLM](https://llm.datasette.io/) plugin that provides AWS Bedrock integration using the Converse API, enabling advanced tool calling, streaming responses, and embeddings for Claude models.
 
-- ✅ Tool calling / function calling support
-- ✅ Works with MCP servers via llm-tools-mcp
-- ✅ Streaming responses
-- ✅ Conversation history
-- ✅ Multi-modal (images, PDFs, videos)
-- ✅ All Claude models on Bedrock
-- ✅ Cross-region inference profiles
+## ✨ Features
 
-## Installation
+- 🔧 **Full Tool Calling Support** - Native function calling with the Converse API
+- 🌊 **Streaming Responses** - Real-time token streaming for interactive experiences
+- 🎯 **MCP Server Integration** - Works seamlessly with llm-tools-mcp
+- 📎 **Multi-Modal Support** - Handle images, PDFs, and videos
+- 🔄 **Conversation History** - Maintain context across multiple turns
+- 🚀 **All Claude Models** - Support for Claude 3, 3.5, 4, and cross-region profiles
+- 📊 **Titan Embeddings** - Generate embeddings with Amazon Titan models
+- ⚡ **Automatic Retry Logic** - Built-in throttling and error handling
+
+## 📦 Installation
 
 ```bash
 llm install llm-bedrock-converse
 ```
 
-## Configuration
+## 🔑 Configuration
 
-Uses standard AWS credentials (boto3). Set region via environment variable:
+The plugin uses standard AWS credentials via boto3. Configure your credentials using any of these methods:
 
 ```bash
+# Environment variables
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
 export AWS_REGION=us-east-1
+
+# Or use AWS CLI
+aws configure
+
+# Or use IAM roles (recommended for EC2/Lambda)
 ```
 
-Or use AWS CLI default credentials.
+## 🚀 Usage
 
-## Usage
-
-### Basic prompting
+### Basic Prompting
 
 ```bash
-llm -m bedrock-converse/claude-3-haiku "Hello"
+# Simple prompt
+llm -m bedrock-converse/claude-3-haiku "Explain quantum computing"
+
+# Using short alias
+llm -m bc-haiku "What is the capital of France?"
+
+# With system prompt
+llm -m bc-sonnet-3.5 -s "You are a Python expert" "Write a decorator"
 ```
 
-### With tool calling
+### Tool Calling
 
 ```bash
 # Built-in tools
-llm -m bedrock-converse/claude-3-haiku -T llm_time "What time is it?"
+llm -m bc-haiku -T llm_time "What time is it?"
 
 # MCP servers (requires llm-tools-mcp)
-llm -m bedrock-converse/claude-3-haiku -T MCP "What time is it in Tokyo?"
+llm -m bc-sonnet-3.5 -T MCP "What's the weather in Tokyo?"
 
 # Custom functions
-llm -m bedrock-converse/claude-3-haiku --functions 'def add(a: int, b: int): return a + b' "What is 5+7?"
+llm -m bc-haiku --functions 'def multiply(a: int, b: int) -> int: return a * b' \
+    "What is 23 times 47?"
 ```
 
-### Chat mode
+### Chat Mode
 
 ```bash
-llm chat -m bedrock-converse/claude-3-haiku
+# Interactive chat with conversation history
+llm chat -m bc-sonnet-3.5
+
+# Chat with system prompt
+llm chat -m bc-haiku -s "You are a helpful coding assistant"
 ```
 
-## Available Models
+### Multi-Modal Inputs
 
-All models support tool calling via Converse API:
+```bash
+# Analyze an image
+llm -m bc-sonnet-3.5 "Describe this image" -a image.jpg
 
-- `anthropic.claude-3-haiku-20240307-v1:0` (alias: `bedrock-converse/claude-3-haiku`, `bc-haiku`)
-- `anthropic.claude-3-5-haiku-20241022-v1:0` (alias: `bedrock-converse/claude-3.5-haiku`, `bc-haiku-3.5`)
-- `anthropic.claude-3-sonnet-20240229-v1:0` (alias: `bedrock-converse/claude-3-sonnet`, `bc-sonnet`)
-- `anthropic.claude-3-5-sonnet-20240620-v1:0` (alias: `bedrock-converse/claude-3.5-sonnet`, `bc-sonnet-3.5`)
-- `anthropic.claude-3-7-sonnet-20250219-v1:0` (alias: `bedrock-converse/claude-3.7-sonnet`, `bc-sonnet-3.7`)
-- `anthropic.claude-3-opus-20240229-v1:0` (alias: `bedrock-converse/claude-3-opus`, `bc-opus`)
-- `anthropic.claude-sonnet-4-20250514-v1:0` (alias: `bedrock-converse/claude-4-sonnet`, `bc-sonnet-4`)
-- `anthropic.claude-sonnet-4-5-20250929-v1:0` (alias: `bedrock-converse/claude-4.5-sonnet`, `bc-sonnet-4.5`)
-- `anthropic.claude-opus-4-20250514-v1:0` (alias: `bedrock-converse/claude-4-opus`, `bc-opus-4`)
-- `anthropic.claude-opus-4-1-20250805-v1:0` (alias: `bedrock-converse/claude-4.1-opus`, `bc-opus-4.1`)
-- `anthropic.claude-haiku-4-5-20251001-v1:0` (alias: `bedrock-converse/claude-4.5-haiku`, `bc-haiku-4.5`)
+# Process a PDF document
+llm -m bc-opus "Summarize this document" -a report.pdf
 
-Cross-region models (us. prefix):
-- `us.anthropic.claude-3-5-sonnet-20241022-v2:0` (alias: `bc-sonnet-3.5-v2`)
-- `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (alias: `bc-sonnet-4.5-us`)
-- `us.anthropic.claude-opus-4-1-20250805-v1:0` (alias: `bc-opus-4.1-us`)
+# Multiple attachments
+llm -m bc-sonnet-3.5 "Compare these images" -a img1.jpg -a img2.jpg
+```
 
-Global models (global. prefix):
-- `global.anthropic.claude-sonnet-4-20250514-v1:0` (alias: `bc-sonnet-4-global`)
-- `global.anthropic.claude-sonnet-4-5-20250929-v1:0` (alias: `bc-sonnet-4.5-global`)
+### Embeddings
 
-## License
+```bash
+# Generate embeddings with Titan v2
+llm embed -m titan-v2 -c "Hello world"
 
-Apache-2.0
+# Embed multiple texts
+llm embed -m titan-v2 -c "Text 1" -c "Text 2" -c "Text 3"
+
+# Use Titan v1
+llm embed -m titan-v1 -c "Your text here"
+```
+
+## 🤖 Available Models
+
+### Claude Models
+
+| Model ID | Alias | Description |
+|----------|-------|-------------|
+| `anthropic.claude-3-haiku-20240307-v1:0` | `bc-haiku` | Fast, cost-effective |
+| `anthropic.claude-3-5-haiku-20241022-v1:0` | `bc-haiku-3.5` | Enhanced Haiku |
+| `anthropic.claude-haiku-4-5-20251001-v1:0` | `bc-haiku-4.5` | Latest Haiku |
+| `anthropic.claude-3-sonnet-20240229-v1:0` | `bc-sonnet` | Balanced performance |
+| `anthropic.claude-3-5-sonnet-20240620-v1:0` | `bc-sonnet-3.5` | Most popular |
+| `anthropic.claude-3-7-sonnet-20250219-v1:0` | `bc-sonnet-3.7` | Advanced Sonnet |
+| `anthropic.claude-sonnet-4-20250514-v1:0` | `bc-sonnet-4` | Claude 4 Sonnet |
+| `anthropic.claude-sonnet-4-5-20250929-v1:0` | `bc-sonnet-4.5` | Latest Sonnet |
+| `anthropic.claude-3-opus-20240229-v1:0` | `bc-opus` | Most capable |
+| `anthropic.claude-opus-4-20250514-v1:0` | `bc-opus-4` | Claude 4 Opus |
+| `anthropic.claude-opus-4-1-20250805-v1:0` | `bc-opus-4.1` | Latest Opus |
+
+### Cross-Region Models
+
+| Model ID | Alias | Description |
+|----------|-------|-------------|
+| `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | `bc-sonnet-3.5-v2` | US inference profile |
+| `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | `bc-sonnet-4.5-us` | US Sonnet 4.5 |
+| `us.anthropic.claude-opus-4-1-20250805-v1:0` | `bc-opus-4.1-us` | US Opus 4.1 |
+
+### Global Models
+
+| Model ID | Alias | Description |
+|----------|-------|-------------|
+| `global.anthropic.claude-sonnet-4-20250514-v1:0` | `bc-sonnet-4-global` | Global Sonnet 4 |
+| `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | `bc-sonnet-4.5-global` | Global Sonnet 4.5 |
+
+### Embedding Models
+
+| Model ID | Alias | Dimensions |
+|----------|-------|------------|
+| `amazon.titan-embed-text-v2:0` | `titan-v2` | 1024 |
+| `amazon.titan-embed-text-v1` | `titan-v1` | 1536 |
+
+## 🛠️ Advanced Features
+
+### Retry Logic
+
+The plugin automatically handles throttling with exponential backoff:
+
+```python
+# Automatically retries on ThrottlingException
+# Respects retry-after headers
+# Up to 5 retry attempts with exponential backoff
+```
+
+### Rate Limiting
+
+Embeddings include built-in rate limiting (100 RPM for Titan models):
+
+```python
+# Automatically enforces 0.6s minimum interval between requests
+# Prevents throttling errors
+```
+
+### Conversation Context
+
+```bash
+# Maintains full conversation history
+llm chat -m bc-sonnet-3.5
+> What is Python?
+> Can you show me an example? # Context maintained
+```
+
+## 📚 Documentation
+
+- [LLM Documentation](https://llm.datasette.io/)
+- [AWS Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+- [Tool Use Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use.html)
+
+## 🐛 Troubleshooting
+
+### No AWS credentials found
+
+```bash
+# Set credentials explicitly
+export AWS_ACCESS_KEY_ID=your_key
+export AWS_SECRET_ACCESS_KEY=your_secret
+export AWS_REGION=us-east-1
+```
+
+### Model not available in region
+
+```bash
+# Check model availability in your region
+aws bedrock list-foundation-models --region us-east-1
+
+# Use cross-region inference profiles (us. or global. prefix)
+llm -m bc-sonnet-4.5-us "Your prompt"
+```
+
+### Throttling errors
+
+The plugin automatically retries with exponential backoff. If issues persist:
+- Use cross-region profiles for better availability
+- Implement request batching
+- Request quota increases via AWS Support
+
+## 📄 License
+
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please feel free to submit issues or pull requests.
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/geehexx/llm-bedrock-converse)
+- [PyPI Package](https://pypi.org/project/llm-bedrock-converse/)
+- [LLM Plugin Ecosystem](https://llm.datasette.io/en/stable/plugins/directory.html)

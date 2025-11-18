@@ -59,6 +59,86 @@ FORMAT_TYPES = {
 
 
 @llm.hookimpl
+def register_embedding_models(register):
+    register(BedrockTitanEmbedding("amazon.titan-embed-text-v2:0", "titan-v2"))
+    register(BedrockTitanEmbedding("amazon.titan-embed-text-v1", "titan-v1"))
+
+
+class BedrockTitanEmbedding(llm.EmbeddingModel):
+    needs_key = None
+    supports_text = True
+    supports_binary = False
+    
+    def __init__(self, model_id: str, alias: str):
+        self.model_id = model_id
+        self.model_name = alias
+        self._client = None
+        self._last_request_time = 0
+        self._min_interval = 0.6  # 100 RPM = 0.6s between requests
+    
+    def _get_client(self):
+        if self._client is None:
+            self._client = boto3.client(
+                "bedrock-runtime",
+                region_name=AWS_REGION
+            )
+        return self._client
+    
+    def _rate_limit(self):
+        """Ensure we don't exceed 100 RPM"""
+        elapsed = time.time() - self._last_request_time
+        if elapsed < self._min_interval:
+            time.sleep(self._min_interval - elapsed)
+        self._last_request_time = time.time()
+    
+    def _embed_with_retry(self, text: str, max_retries: int = 5) -> List[float]:
+        """Embed with exponential backoff and retry-after respect"""
+        client = self._get_client()
+        
+        for attempt in range(max_retries):
+            try:
+                self._rate_limit()
+                
+                body = json.dumps({"inputText": text})
+                response = client.invoke_model(
+                    modelId=self.model_id,
+                    body=body,
+                    contentType="application/json",
+                    accept="application/json"
+                )
+                
+                result = json.loads(response['body'].read())
+                return result['embedding']
+                
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                
+                if error_code == 'ThrottlingException':
+                    # Check for retry-after header
+                    retry_after = e.response.get('ResponseMetadata', {}).get('HTTPHeaders', {}).get('retry-after')
+                    if retry_after:
+                        wait_time = int(retry_after)
+                    else:
+                        # Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                        wait_time = min(2 ** attempt, 16)
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(wait_time)
+                        continue
+                
+                raise
+        
+        raise Exception(f"Failed to embed after {max_retries} retries")
+    
+    def embed(self, text: str) -> List[float]:
+        return self._embed_with_retry(text)
+    
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Embed multiple texts with rate limiting"""
+        return [self.embed(text) for text in texts]
+
+
+@llm.hookimpl
 def register_models(register):
     for model_id, aliases, supports_attachments in MODELS:
         register(

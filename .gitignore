@@ -1,7 +1,10 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -18,11 +21,35 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
-*.log
+.tox/
+.hypothesis/
+
+# Environments
 .env
 .venv
 env/
 venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Amazon Q
+.amazonq/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
