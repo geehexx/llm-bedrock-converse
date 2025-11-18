@@ -3,7 +3,7 @@ name = "llm-bedrock-converse"
 version = "0.1.0"
 description = "LLM plugin for AWS Bedrock Converse API with tool calling and embeddings support"
 readme = "README.md"
-authors = [{name = "geehexx"}]
+authors = [{name = "geehexx", email = "andrewcrozier86@gmail.com"}]
 license = {text = "Apache-2.0"}
 requires-python = ">=3.8"
 classifiers = [
