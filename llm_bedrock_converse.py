@@ -2,13 +2,21 @@ import boto3
 import llm
 import os
 import json
+import time
 from typing import Optional, List, Dict, Any
+from botocore.exceptions import ClientError
 
 # AWS Region configuration
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 # Model definitions: (model_id, aliases, supports_attachments)
 MODELS = (
+    # US Inference Profiles (recommended - cross-region routing)
+    ("us.anthropic.claude-haiku-4-5-20251001-v1:0", ("bc-haiku-4.5-us", "bc-haiku-us"), True),
+    ("us.anthropic.claude-sonnet-4-5-20250929-v1:0", ("bc-sonnet-4.5-us", "bc-sonnet-us"), True),
+    ("us.anthropic.claude-3-5-haiku-20241022-v1:0", ("bc-haiku-3.5-us",), True),
+    ("us.anthropic.claude-3-5-sonnet-20240620-v1:0", ("bc-sonnet-3.5-us",), True),
+    
     # Claude 3 Haiku
     ("anthropic.claude-3-haiku-20240307-v1:0", ("bedrock-converse/claude-3-haiku", "bc-haiku"), True),
     ("anthropic.claude-3-5-haiku-20241022-v1:0", ("bedrock-converse/claude-3.5-haiku", "bc-haiku-3.5"), True),
@@ -26,10 +34,8 @@ MODELS = (
     ("anthropic.claude-opus-4-20250514-v1:0", ("bedrock-converse/claude-4-opus", "bc-opus-4"), True),
     ("anthropic.claude-opus-4-1-20250805-v1:0", ("bedrock-converse/claude-4.1-opus", "bc-opus-4.1"), True),
     
-    # Cross-region models (us. prefix)
+    # Cross-region models (us. prefix - older style)
     ("us.anthropic.claude-3-5-sonnet-20241022-v2:0", ("bc-sonnet-3.5-v2",), True),
-    ("us.anthropic.claude-sonnet-4-5-20250929-v1:0", ("bc-sonnet-4.5-us",), True),
-    ("us.anthropic.claude-opus-4-1-20250805-v1:0", ("bc-opus-4.1-us",), True),
     
     # Global models (global. prefix)
     ("global.anthropic.claude-sonnet-4-20250514-v1:0", ("bc-sonnet-4-global",), True),
@@ -75,6 +81,34 @@ class BedrockConverseModel(llm.Model):
                 "video/quicktime", "video/x-matroska", "video/mp4",
                 "video/webm", "video/x-flv", "video/mpeg", "video/x-ms-wmv",
             }
+
+    def _call_bedrock_with_retry(self, bedrock, method_name: str, params: Dict, max_retries: int = 5):
+        """Call Bedrock API with exponential backoff retry logic."""
+        for attempt in range(max_retries):
+            try:
+                method = getattr(bedrock, method_name)
+                return method(**params)
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                
+                if error_code == 'ThrottlingException':
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                        wait_time = 2 ** attempt
+                        
+                        # Check if API provided retry-after header
+                        retry_after = e.response.get('ResponseMetadata', {}).get('HTTPHeaders', {}).get('retry-after')
+                        if retry_after:
+                            try:
+                                wait_time = max(wait_time, int(retry_after))
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        time.sleep(wait_time)
+                        continue
+                
+                # Re-raise if not throttling or max retries reached
+                raise
 
     def _build_content(self, prompt) -> List[Dict[str, Any]]:
         """Build content array with attachments and text."""
@@ -192,7 +226,7 @@ class BedrockConverseModel(llm.Model):
 
     def _execute_stream(self, bedrock, params, response, prompt):
         """Execute streaming request with tool support."""
-        bedrock_response = bedrock.converse_stream(**params)
+        bedrock_response = self._call_bedrock_with_retry(bedrock, 'converse_stream', params)
         
         text_chunks = []
         usage = {}
@@ -219,7 +253,7 @@ class BedrockConverseModel(llm.Model):
         # because streaming tool use is complex
         if stop_reason == "tool_use":
             # Re-run without streaming to get tool use
-            non_stream_response = bedrock.converse(**params)
+            non_stream_response = self._call_bedrock_with_retry(bedrock, 'converse', params)
             output = non_stream_response["output"]["message"]
             content = output["content"]
             
@@ -247,7 +281,7 @@ class BedrockConverseModel(llm.Model):
                     })
                     
                     # Get final response (non-streaming for simplicity)
-                    final_response = bedrock.converse(**params)
+                    final_response = self._call_bedrock_with_retry(bedrock, 'converse', params)
                     final_output = final_response["output"]["message"]
                     
                     for block in final_output["content"]:
@@ -265,7 +299,7 @@ class BedrockConverseModel(llm.Model):
 
     def _execute_non_stream(self, bedrock, params, response, prompt):
         """Execute non-streaming request with tool support."""
-        bedrock_response = bedrock.converse(**params)
+        bedrock_response = self._call_bedrock_with_retry(bedrock, 'converse', params)
         
         output = bedrock_response["output"]["message"]
         content = output["content"]
@@ -295,7 +329,7 @@ class BedrockConverseModel(llm.Model):
                 })
                 
                 # Get final response
-                final_response = bedrock.converse(**params)
+                final_response = self._call_bedrock_with_retry(bedrock, 'converse', params)
                 output = final_response["output"]["message"]
                 content = output["content"]
         
