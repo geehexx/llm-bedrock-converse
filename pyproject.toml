@@ -1,0 +1,25 @@
+[project]
+name = "llm-bedrock-converse"
+version = "0.1.0"
+description = "LLM plugin for AWS Bedrock Converse API with tool calling support"
+readme = "README.md"
+authors = [{name = "llm-bedrock-converse"}]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.8"
+dependencies = [
+    "llm>=0.19",
+    "boto3>=1.35.0"
+]
+
+[project.entry-points.llm]
+bedrock_converse = "llm_bedrock_converse"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio"
+]
